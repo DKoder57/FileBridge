@@ -21,18 +21,39 @@
 | Chat persistente | Contra a intenção de design de privacidade/efemeridade |
 | Contas / login | Explicitamente não desejado — sem contas, sem lista de contatos |
 
-## Questões em aberto
+## Decisões resolvidas (2026-07-18)
 
-Ainda não resolvidas — precisam de decisão antes ou durante a implementação:
+### 1. Formato do código de sessão
 
-1. **Formato do código de sessão** — `TIGER-42`? 6 dígitos? `adjetivo-substantivo-número`? Qualquer string curta e legível serve, mas a lógica de geração precisa de um formato específico pra implementar.
+**Decidido:** `ANIMAL-NN` — palavra em maiúsculas de uma lista de animais + 2 dígitos. Ex: `TIGER-42`.
 
-2. **Regras de produção do Firebase** — hoje o repo mostra regras de dev/teste. Regras de produção devem restringir escrita a novos códigos de sessão apenas, e definir um TTL de expiração. Estrutura exata ainda não decidida.
+- Exibição em espelho na tela de geração (fonte grande, orientação invertida) — pensado pra quando os dois dispositivos ficam com a tela virada um pro outro durante o pareamento, facilitando a leitura simultânea dos dois lados. **Assunção a confirmar:** se "espelhado" tinha outro sentido em mente, ajustar o design da tela de geração de código.
+- Lista de animais fica em `core/session/` como constante, fácil de expandir depois.
 
-3. **Limite de tamanho de arquivo** — WebRTC DataChannel aguenta arquivos grandes, mas a estratégia de fragmentação importa em mobile. Sem limite definido ainda.
+### 2. Regras de produção do Firebase
 
-4. **Fallback quando o P2P via WebRTC falha** — em redes restritivas, a conexão direta pode falhar mesmo com STUN. `flutter_webrtc` suporta servidores TURN como fallback, mas TURN tem custo. Sem estratégia de fallback definida.
+**Decidido:** Firebase armazena **apenas** o código de sessão e os dados de sinalização (SDP/ICE) — nunca nome de usuário, arquivo, mensagem ou qualquer dado pessoal. Plano gratuito (Spark) confirmado, sem cartão de crédito.
 
-5. **Empacotamento pra Windows Store** — builds Flutter Windows exigem empacotamento MSIX pra loja. Ainda não discutido; adiciona um passo ao build.
+Regras de produção devem:
+- Permitir **escrita** apenas para criar um novo nó de sessão com um código ainda não existente (sem sobrescrever sessões ativas de outros)
+- Exigir um campo de timestamp na criação do nó
+- Restringir **leitura** ao código exato da sessão (sem listagem/enumeração de sessões existentes)
+- Expiração (TTL): como o plano Spark não roda Cloud Functions agendadas com saída de rede, a limpeza é feita client-side — ao tentar entrar em um código, o cliente verifica o timestamp e trata como expirado (e limpa) se passou do TTL (sugestão: 5 minutos)
 
-6. **Colisão de códigos de sessão** — se dois usuários não relacionados gerarem o mesmo código ao mesmo tempo, eles se conectariam um ao outro. Precisa de estratégia de resistência a colisão (códigos mais longos, checagem de unicidade no servidor, ou limpeza baseada em TTL).
+### 3. Limite de tamanho de arquivo
+
+**Decidido:** Sem limite artificial de tamanho. A fragmentação (chunking) é adaptativa. Um aviso/guarda técnica só entra em cena se o tamanho do arquivo puder causar problema real de memória ou desempenho no dispositivo (principalmente mobile) — não como restrição de produto, só como proteção técnica.
+
+### 5. Empacotamento para Windows Store
+
+**Decidido:** Fazer a integração com MSIX. Avaliação do autor: não deve ser difícil nem trabalhoso. Deixa de ser uma questão em aberto e vira item normal do roadmap de lançamento.
+
+### 6. Colisão de códigos de sessão
+
+**Decidido:** Ao gerar/entrar numa sessão, o usuário digita um apelido local (não salvo, não sincronizado, não é conta/login — só usado naquele momento). Esse apelido participa da composição/verificação do código, reduzindo a chance de colisão entre usuários não relacionados. Continua sem contas: o apelido não persiste em disco nem em nenhum backend.
+
+## Questões ainda em aberto
+
+### 4. Fallback quando o P2P via WebRTC falha
+
+Sem estratégia definida ainda. Em redes restritivas, a conexão direta pode falhar mesmo com STUN. `flutter_webrtc` suporta servidores TURN como fallback, mas TURN tem custo — o que conflita com a restrição de zero orçamento para servidores. Precisa de decisão futura: aceitar que a sessão simplesmente falhe nesses casos (mensagem de erro clara ao usuário), ou buscar TURN gratuito/de baixo custo mais adiante.
