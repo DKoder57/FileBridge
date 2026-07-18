@@ -1,59 +1,86 @@
-# Decisões técnicas — FileBridge
+# Decisões Técnicas
 
-## Decisões já tomadas
+Registro de decisões importantes do projeto, para evitar perda de contexto e facilitar manutenção futura.
 
-### O que o app é (e não é)
+---
 
-- É uma ferramenta **P2P, efêmera, baseada em sessão** para arquivos e mensagens
-- **Não é** chat persistente, armazenamento em nuvem ou plataforma de mensagens geral
-- Usuários-alvo: devs que trabalham com VMs, pessoas que precisam de transferência rápida entre dispositivos sem configuração
-- Distribuição: gratuito na Google Play + Microsoft Store, com coleta de feedback no próprio app (sem monetização por enquanto)
+Data: 2026-07-18
+Decisão: Não haverá contas ou login no FileBridge.
+Motivo: Manter o app o mais simples e privado possível — pareamento via código de sessão é suficiente para o caso de uso, sem exigir cadastro, senha ou lista de contatos.
+Alternativas consideradas:
 
-### Ideias descartadas
+* Login com e-mail/senha
+* Login social (Google/Apple)
+* Perfil local persistente no dispositivo
 
-| Ideia | Motivo |
-|---|---|
-| CLI em Go | Desnecessário — Flutter roda em Linux desktop também, e o caso de uso da VM pode usar o app Flutter direto se houver display |
-| Tailscale / WireGuard | Não embutível em app de loja |
-| Supabase para sinalização | Projeto Supabase do autor está pausado/em risco; quer separação de infraestrutura |
-| Node.js / Express server | Pesado demais pro requisito de "extremamente leve" |
-| Código QR | Adiado pro roadmap (não é MVP) |
-| Chat persistente | Contra a intenção de design de privacidade/efemeridade |
-| Contas / login | Explicitamente não desejado — sem contas, sem lista de contatos |
+---
 
-## Decisões resolvidas (2026-07-18)
+Data: 2026-07-18
+Decisão: Sinalização via Firebase Realtime Database (plano gratuito Spark), usada apenas para o handshake WebRTC.
+Motivo: Dois dispositivos em redes diferentes não conseguem se encontrar sem um intermediário (problema de NAT). O Firebase resolve isso sem custo, mesmo em escala, pois os dados de sinalização são mínimos e descartados após ~1-2 segundos.
+Alternativas consideradas:
 
-### 1. Formato do código de sessão
+* Supabase (projeto do autor já pausado/em risco, quer separação de infraestrutura)
+* Servidor de relay próprio (custo de servidor)
+* Tailscale/WireGuard (não embutível em app de loja)
+* P2P puro sem sinalização (tecnicamente impossível entre redes diferentes)
 
-**Decidido:** `ANIMAL-NN` — palavra em maiúsculas de uma lista de animais + 2 dígitos. Ex: `TIGER-42`.
+---
 
-- Exibição em espelho na tela de geração (fonte grande, orientação invertida) — pensado pra quando os dois dispositivos ficam com a tela virada um pro outro durante o pareamento, facilitando a leitura simultânea dos dois lados. **Assunção a confirmar:** se "espelhado" tinha outro sentido em mente, ajustar o design da tela de geração de código.
-- Lista de animais fica em `core/session/` como constante, fácil de expandir depois.
+Data: 2026-07-18
+Decisão: Formato do código de sessão é `ANIMAL-NN` (ex: `TIGER-42`), com exibição espelhada na tela de geração.
+Motivo: Precisa ser curto, legível e fácil de comunicar verbalmente ou visualmente entre duas pessoas. A exibição espelhada facilita a leitura quando os dois dispositivos ficam com a tela virada um para o outro durante o pareamento.
+Alternativas consideradas:
 
-### 2. Regras de produção do Firebase
+* Código numérico de 6 dígitos
+* Formato adjetivo-substantivo-número
 
-**Decidido:** Firebase armazena **apenas** o código de sessão e os dados de sinalização (SDP/ICE) — nunca nome de usuário, arquivo, mensagem ou qualquer dado pessoal. Plano gratuito (Spark) confirmado, sem cartão de crédito.
+---
 
-Regras de produção devem:
-- Permitir **escrita** apenas para criar um novo nó de sessão com um código ainda não existente (sem sobrescrever sessões ativas de outros)
-- Exigir um campo de timestamp na criação do nó
-- Restringir **leitura** ao código exato da sessão (sem listagem/enumeração de sessões existentes)
-- Expiração (TTL): como o plano Spark não roda Cloud Functions agendadas com saída de rede, a limpeza é feita client-side — ao tentar entrar em um código, o cliente verifica o timestamp e trata como expirado (e limpa) se passou do TTL (sugestão: 5 minutos)
+Data: 2026-07-18
+Decisão: Firebase armazena apenas o código de sessão, timestamp e dados de sinalização (SDP/ICE) — nunca dados pessoais, arquivos ou mensagens. Regras de produção restringem escrita à criação de sessões novas, restringem leitura ao código exato (sem listagem), e a expiração (TTL, ~5 min) é verificada client-side.
+Motivo: Manter a garantia de privacidade do produto mesmo em produção, e evitar custo de Cloud Functions agendadas, que exigem o plano pago (Blaze).
+Alternativas consideradas:
 
-### 3. Limite de tamanho de arquivo
+* Cloud Functions agendadas para limpeza automática (exige plano Blaze, fora do orçamento zero)
+* Regras de leitura/escrita abertas (mantidas apenas em desenvolvimento, inseguras para produção)
 
-**Decidido:** Sem limite artificial de tamanho. A fragmentação (chunking) é adaptativa. Um aviso/guarda técnica só entra em cena se o tamanho do arquivo puder causar problema real de memória ou desempenho no dispositivo (principalmente mobile) — não como restrição de produto, só como proteção técnica.
+---
 
-### 5. Empacotamento para Windows Store
+Data: 2026-07-18
+Decisão: Sem limite artificial de tamanho de arquivo. Fragmentação adaptativa via DataChannel, com aviso (não bloqueio) apenas quando o tamanho puder causar problema real de memória/desempenho no dispositivo.
+Motivo: O produto não deve impor uma restrição arbitrária ao usuário; a única preocupação legítima é a estabilidade técnica do app em dispositivos com pouca memória.
+Alternativas consideradas:
 
-**Decidido:** Fazer a integração com MSIX. Avaliação do autor: não deve ser difícil nem trabalhoso. Deixa de ser uma questão em aberto e vira item normal do roadmap de lançamento.
+* Limite fixo de tamanho (ex: 100MB) independente do dispositivo
+* Bloqueio hard acima de um limiar técnico
 
-### 6. Colisão de códigos de sessão
+---
 
-**Decidido:** Ao gerar/entrar numa sessão, o usuário digita um apelido local (não salvo, não sincronizado, não é conta/login — só usado naquele momento). Esse apelido participa da composição/verificação do código, reduzindo a chance de colisão entre usuários não relacionados. Continua sem contas: o apelido não persiste em disco nem em nenhum backend.
+Data: 2026-07-18
+Decisão: Fazer a integração de empacotamento MSIX para publicação na Microsoft Store.
+Motivo: Passo necessário para builds Flutter Windows em lojas; avaliado pelo autor como simples de implementar, sem justificar adiamento.
+Alternativas consideradas:
 
-## Questões ainda em aberto
+* Distribuir o app Windows apenas via instalador próprio, fora da Microsoft Store
 
-### 4. Fallback quando o P2P via WebRTC falha
+---
 
-Sem estratégia definida ainda. Em redes restritivas, a conexão direta pode falhar mesmo com STUN. `flutter_webrtc` suporta servidores TURN como fallback, mas TURN tem custo — o que conflita com a restrição de zero orçamento para servidores. Precisa de decisão futura: aceitar que a sessão simplesmente falhe nesses casos (mensagem de erro clara ao usuário), ou buscar TURN gratuito/de baixo custo mais adiante.
+Data: 2026-07-18
+Decisão: Resolver colisão de código de sessão com um apelido local (não salvo, não sincronizado, não é conta) digitado a cada sessão, que participa da composição/verificação do código.
+Motivo: Reduz a chance de dois usuários não relacionados gerarem o mesmo código simultaneamente, sem violar a decisão de não ter contas — o apelido nunca persiste em disco ou backend.
+Alternativas consideradas:
+
+* Códigos mais longos (menor probabilidade de colisão, mas menos amigável de digitar)
+* Checagem de unicidade centralizada no servidor sem envolver o usuário
+* Limpeza baseada em TTL apenas (não resolve colisão simultânea, só libera códigos expirados)
+
+---
+
+Data: 2026-07-18
+Decisão: Estratégia de fallback para quando o P2P via WebRTC falha (redes restritivas onde STUN não é suficiente) ainda não foi definida.
+Motivo: TURN resolveria o problema tecnicamente, mas tem custo recorrente, o que conflita com a restrição de zero orçamento para servidores. Falta decidir entre aceitar a falha com mensagem clara ao usuário ou buscar um provedor de TURN gratuito/baixo custo.
+Alternativas consideradas:
+
+* Aceitar falha da sessão com mensagem de erro clara (sem custo, pior experiência em redes restritivas)
+* Servidor TURN próprio ou de terceiros (resolve o problema, mas tem custo)
