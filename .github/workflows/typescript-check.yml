@@ -1,0 +1,34 @@
+name: TypeScript Check
+
+on:
+  pull_request:
+    # Ajuste: nome da branch principal do projeto (main / master / develop)
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Ajuste: versão do Node usada no projeto
+          node-version: '20'
+          cache: 'npm'
+
+      # Ajuste (monorepo): se o package.json não estiver na raiz (ex: Jome
+      # Cargus), adicione em cada step abaixo:
+      #   working-directory: ./apps/nome-do-pacote
+      - name: Instalar dependências
+        run: npm ci
+
+      # Ajuste: troque `npm ci` / `npx tsc` por `yarn` / `pnpm` se o
+      # projeto usar outro gerenciador de pacotes
+      - name: Checar tipos (tsc --noEmit)
+        run: npx tsc --noEmit

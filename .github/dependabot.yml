@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  # Ajuste (monorepo): se houver mais de um package.json (ex: Jome Cargus
+  # com /apps/*), duplique este bloco trocando o "directory" para cada um,
+  # ex: "/apps/web", "/apps/api"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # Ajuste: quantos PRs de dependência o Dependabot pode manter abertos
+    # ao mesmo tempo antes de parar de abrir novos
+    open-pull-requests-limit: 10
+
+  # Mantém as próprias GitHub Actions atualizadas (ex: actions/checkout@v4).
+  # Normalmente não precisa mexer aqui.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
