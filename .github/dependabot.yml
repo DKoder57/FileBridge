@@ -12,9 +12,42 @@ updates:
     # ao mesmo tempo antes de parar de abrir novos
     open-pull-requests-limit: 10
 
+    # Modelo otimizado: agrupa minor+patch numa única PR em vez de uma PR
+    # por dependência. Major não entra no grupo de propósito - fica numa
+    # PR separada, porque major costuma quebrar API e merece revisão isolada.
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+
+    # Modelo otimizado: o Dependabot já aplica cooldown padrão de 3 dias
+    # desde jul/2026 (não sugere versão recém-lançada de cara). Aqui fica
+    # explícito e ajustado por severidade: major espera mais (mais risco de
+    # quebrar/pacote comprometido recém-descoberto), patch quase não espera.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 1
+
+    # Facilita filtrar/triar as PRs do Dependabot no board de Issues
+    labels:
+      - "dependencies"
+
   # Mantém as próprias GitHub Actions atualizadas (ex: actions/checkout@v4).
   # Normalmente não precisa mexer aqui.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+      - "ci"
