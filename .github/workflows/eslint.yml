@@ -1,5 +1,10 @@
 name: ESLint
 
+# Ajuste (stack não-Node): este workflow só se aplica a projetos com
+# package.json (GreenKeeper, WebViolin, Jome Cargus). Pra um projeto fora
+# do ecossistema npm (ex: Snake Duel em Unity/C#), delete este arquivo -
+# use o linter/analisador nativo da stack em vez de adaptar este.
+
 on:
   pull_request:
     # Ajuste: nome da branch principal do projeto (main / master / develop)
