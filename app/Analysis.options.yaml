@@ -1,0 +1,6 @@
+include: package:flutter_lints/flutter.yaml
+
+# Ajuste: adicione ou desative regras específicas do projeto aqui, ex:
+# linter:
+#   rules:
+#     avoid_print: false
