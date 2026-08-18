@@ -1,0 +1,27 @@
+name: Flutter Analyze
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v7
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Ajuste: canal/versão do Flutter usada no projeto
+          channel: 'stable'
+          cache: true
+      - name: Instalar dependências
+        working-directory: ./app
+        run: flutter pub get
+      - name: Checar formatação (dart format)
+        working-directory: ./app
+        run: dart format --set-exit-if-changed .
+      - name: Analisar código (flutter analyze)
+        working-directory: ./app
+        run: flutter analyze
