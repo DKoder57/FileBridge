@@ -313,10 +313,8 @@ O usuário poderá escolher entre três perfis fixos e um modo automático.
 | -------------- | ----------------: | ----------------: | ----------------- |
 | **Alta**       |         1920×1080 |            60 FPS | Máxima qualidade  |
 | **Média**      |          1280×720 |            30 FPS | Equilíbrio        |
-| **Baixa**      |           854×420 |            15 FPS | Menor consumo     |
+| **Baixa**      |           854×480 |            15 FPS | Menor consumo     |
 | **Automático** | Perfil adaptativo | Perfil adaptativo | Ajuste automático |
-
-> A resolução de `854×420` deve ser validada durante a implementação. Caso seja desejada maior compatibilidade com codificadores e players, `854×480` pode ser utilizado como alternativa.
 
 A escolha manual de um perfil **não deve redimensionar dinamicamente a resolução**.
 
@@ -486,8 +484,8 @@ app/
     │   └── media/
     │       ├── screen_share/
     │       │   ├── captura de tela
-    │       │   └── controle do video track
-    │       │
+    │       │   ├── controle do video track (addTrack, remoção)
+    │       │   └── sender/ ← bitrate, stats do emissor, feedback recebido via DataChannel
     │       ├── receiver/
     │       │   └── recebimento e renderização de vídeo
     │       │
