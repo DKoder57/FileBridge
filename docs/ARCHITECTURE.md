@@ -91,6 +91,8 @@ Responsável por:
 * telemetria necessária para o compartilhamento de vídeo
 * eventual renegociação de mídia após o handshake inicial
 
+O envio de arquivos respeita o `bufferedAmount` do canal: o loop de escrita pausa quando o buffer de saída ultrapassa um limite definido e retoma quando ele esvazia (`bufferedAmountLowThreshold` / `onBufferedAmountLow`). Isso evita que o app enfileire dados mais rápido do que a rede consegue escoar — o principal risco de memória descontrolada em arquivos grandes.
+
 ### Video Track
 
 Responsável por:
@@ -113,6 +115,14 @@ O video track é adicionado à **mesma `RTCPeerConnection`** usada pelo DataChan
 ```
 
 Não é criada uma segunda conexão WebRTC apenas para o vídeo.
+
+---
+
+## Resiliência e desempenho da transferência
+
+Leitura de arquivo, cálculo de hash e fragmentação em chunks rodam fora da isolate principal do Dart (via `Isolate` dedicada ou `compute()`), para que a UI permaneça responsiva durante transferências grandes. Apenas chunks/resultados trafegam entre isolates — não o arquivo inteiro.
+
+Uma queda momentânea de rede não encerra a sessão imediatamente: o app tenta reconectar via ICE restart antes de considerar a conexão perdida, retomando a transferência a partir do último chunk confirmado em vez de reiniciar o arquivo do zero.
 
 ---
 
@@ -172,6 +182,10 @@ A ◄═════════════════════════
 
 Firebase deixa de participar do fluxo de dados.
 
+### STUN
+
+A resolução de candidatos ICE fora de rede local depende de servidores STUN configurados na `RTCPeerConnection`. Sem STUN, o handshake só é confiável dentro da mesma rede local, o que não cobre o caso de uso de origem (VM ↔ host em redes distintas). STUN é o caminho padrão, tentado antes de qualquer fallback via TURN.
+
 ### Fallback TURN
 
 A arquitetura deve prever suporte a **TURN como fallback**, pois nem todas as redes permitem uma conexão P2P direta através de STUN.
@@ -191,6 +205,8 @@ Tentativa P2P direta
 TURN é especialmente relevante para compartilhamento de vídeo, pois uma falha de conectividade que é apenas incômoda durante uma transferência de arquivo pode tornar um streaming inviável.
 
 A decisão de provedor/custo de TURN permanece separada da implementação inicial.
+
+> ⚠️ **Dependência de sequenciamento:** a implementação de compartilhamento de tela (F5) depende da decisão de fallback TURN (F2) já estar registrada em `docs/DECISIONS.md`. Vídeo contínuo é muito mais sensível a P2P instável do que a troca pontual de arquivos — começar F5 sem essa decisão tomada arrisca construir sobre uma base de conectividade ainda indefinida.
 
 ---
 
@@ -357,7 +373,7 @@ troca para perfil inferior
    ↓
 problema persiste
    ↓
-420p15
+480p15
 ```
 
 A subida de qualidade deve ser mais conservadora do que a redução.
@@ -450,7 +466,7 @@ Somente quando o sistema concluir que aquele perfil não consegue mais ser manti
    ↓
 720p30
    ↓
-420p15
+480p15
 ```
 
 Dessa forma, o sistema evita que a imagem fique mudando de resolução constantemente durante uma sessão.
@@ -484,8 +500,11 @@ app/
     │   └── media/
     │       ├── screen_share/
     │       │   ├── captura de tela
-    │       │   ├── controle do video track (addTrack, remoção)
-    │       │   └── sender/ ← bitrate, stats do emissor, feedback recebido via DataChannel
+    │       │   └── controle do video track (addTrack, remoção)
+    │       │
+    │       ├── sender/
+    │       │   └── bitrate, stats do emissor, feedback recebido via DataChannel
+    │       │
     │       ├── receiver/
     │       │   └── recebimento e renderização de vídeo
     │       │
@@ -544,3 +563,4 @@ O projeto deve preservar os seguintes princípios:
 8. **Código específico de plataforma fica isolado na camada de mídia/captura.**
 9. **O app continua sendo único: qualquer dispositivo pode atuar como emissor ou receptor.**
 10. **Nenhum banco de dados persistente é necessário para o funcionamento normal de uma sessão.**
+11. **Otimizações de desempenho (ex: mover trechos do core para Rust via FFI, compressão de arquivo) são decididas com base em métricas medidas, não em suposição.**
